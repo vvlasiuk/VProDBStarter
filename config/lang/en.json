@@ -1,0 +1,32 @@
+{
+  "form": {
+    "login": {
+      "title": "System Login",
+      "username": "Username",
+      "password": "Password"
+    },
+    "config": {
+      "title": "Connection Settings"
+    }
+  },
+  "label": {
+    "server": "Server:",
+    "database": "Database:",
+    "user": "User:",
+    "password": "Password:"
+  },
+  "button": {
+    "submit": "Login",
+    "save": "Save"
+  },
+  "error": {
+    "invalid_credentials": "Invalid username or password"
+  },
+  "log": {
+    "bootstrap": {
+      "start": "System startup",
+      "success": "System started successfully",
+      "error": "Error during startup"
+    }
+  }
+}

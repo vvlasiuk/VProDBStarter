@@ -1,0 +1,20 @@
+{
+  "Sales_UA": {
+    "server": "127.0.0.1",
+    "database": "Sales_UA",
+    "user": "erp_user",
+    "password": "secure123"
+  },
+  "Sales_PL": {
+    "server": "127.0.0.1",
+    "database": "Sales_PL",
+    "user": "erp_user",
+    "password": "secure456"
+  },
+  "Analytics_Test": {
+    "server": "localhost",
+    "database": "Analytics_Test",
+    "user": "dev",
+    "password": "devpass"
+  }
+}
