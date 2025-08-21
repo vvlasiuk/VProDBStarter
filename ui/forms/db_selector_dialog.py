@@ -9,9 +9,9 @@ from PyQt6.QtGui import QIcon
 from core.i18n.localizer import Localizer
 from core.db.db_utils import check_sql_database_exists
 from ui.forms.db_config_dialog import show_config_dialog
+from core.config_paths import CONFIG_DIR
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
-CONFIG_DIR = Path(os.environ.get("USERPROFILE", r"C:\Users\Default")) / "Vlas Pro Enterprise" / "config"
 CONFIG_PATH = CONFIG_DIR / "databases.json"
 LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
 
@@ -171,7 +171,18 @@ class DatabaseSelectorDialog(QDialog):
             print(f"Помилка збереження last_selected_db: {e}")
 
     def add_database(self):
-        show_config_dialog(self)
+        result = show_config_dialog(self)
+        if result:
+            # Оновити список баз
+            self.databases = self.load_databases()
+            self.list_widget.clear()
+            self.list_widget.addItems(self.databases.keys())
+            # Спозиціонуватися на доданій базі
+            db_name = result.get("database")
+            if db_name:
+                items = self.list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
+                if items:
+                    self.list_widget.setCurrentItem(items[0])
 
     def delete_database(self):
         localizer = Localizer()

@@ -1,12 +1,16 @@
-from PyQt6.QtWidgets import QDialog, QLineEdit, QFormLayout, QPushButton, QApplication
+from PyQt6.QtWidgets import QDialog, QLineEdit, QFormLayout, QPushButton, QHBoxLayout, QApplication, QMessageBox
 import sys
 from core.i18n.localizer import Localizer
+import json
+from pathlib import Path
+import uuid
+from core.config_paths import CONFIG_DIR
+from core.db.initializer import initialize_database
 
-def show_config_dialog(lang="uk"):
+def show_config_dialog(parent=None):
     localizer = Localizer()
-    #app = QApplication(sys.argv)
-    dialog = QDialog()
-    dialog.setWindowTitle(localizer.t("dialog.config.title"))
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(localizer.t("form.config.title"))
 
     layout = QFormLayout()
 
@@ -21,15 +25,63 @@ def show_config_dialog(lang="uk"):
     layout.addRow(localizer.t("label.user"), user)
     layout.addRow(localizer.t("label.password"), password)
 
-    btn = QPushButton(localizer.t("button.save"))
-    layout.addWidget(btn)
+    # --- Додаємо кнопки "Зберегти" та "Відмінити" поруч ---
+    btn_layout = QHBoxLayout()
+    btn_save = QPushButton(localizer.t("button.save"))
+    btn_cancel = QPushButton(localizer.t("button.cancel"))
+    btn_layout.addWidget(btn_save)
+    btn_layout.addWidget(btn_cancel)
+    layout.addRow(btn_layout)
 
     dialog.setLayout(layout)
 
+    # Шлях до databases.json (налаштуйте під свою структуру)
+    CONFIG_PATH = CONFIG_DIR / "databases.json"
+
     def on_save():
+        # --- Створення бази даних, якщо не існує ---
+        db_cfg = {
+            "server": server.text(),
+            "database": database.text(),
+            "user": user.text(),
+            "password": password.text()
+        }
+        try:
+            initialize_database(db_cfg)
+        except Exception as e:
+            QMessageBox.critical(dialog, localizer.t("form.config.title"), f"Помилка створення бази: {e}")
+            return
+
+        # Зчитуємо існуючі бази
+        if CONFIG_PATH.exists():
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                databases = json.load(f)
+        else:
+            databases = {}
+
+        db_name = database.text()
+        # Додаємо/оновлюємо запис
+        databases[db_name] = {
+            "id": str(uuid.uuid4()),
+            "server": server.text(),
+            "database": database.text(),
+            "user": "Адміністратор"
+            # Пароль не зберігаємо тут!
+        }
+
+        # Записуємо у файл
+        CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(databases, f, ensure_ascii=False, indent=2)
+
         dialog.accept()
 
-    btn.clicked.connect(on_save)
+    def on_cancel():
+        dialog.reject()
+
+    btn_save.clicked.connect(on_save)
+    btn_cancel.clicked.connect(on_cancel)
+
     if dialog.exec():
         return {
             "server": server.text(),
