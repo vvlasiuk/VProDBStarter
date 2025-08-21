@@ -10,7 +10,9 @@
     },
     "database": {
       "title": "VLAS PRO: Enterprise",
-      "select_label": "Оберіть інформаційну базу"
+      "user_label": "Користувач:",
+      "password_label": "Пароль:",
+      "select_label": "Оберіть ситему управління даними"
     }
   },
   "label": {
@@ -21,6 +23,7 @@
   },
   "button": {
     "submit": "Увійти",
+    "login": "Увійти",
     "save": "Зберегти",
     "select": "Обрати",
     "add": "Додати",

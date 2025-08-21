@@ -2,15 +2,18 @@ import os
 import json
 from pathlib import Path
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QWidget, QMessageBox, QLabel
+    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QWidget, QMessageBox, QLabel, QComboBox, QLineEdit
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from core.i18n.localizer import Localizer
+from core.db.db_utils import check_sql_database_exists
+from ui.forms.db_config_dialog import show_config_dialog
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
-DOCUMENTS = Path(os.environ.get("USERPROFILE", r"C:\Users\Default"))
-CONFIG_PATH = DOCUMENTS / "Vlas Pro Enterprise" / "config" / "databases.json"
+CONFIG_DIR = Path(os.environ.get("USERPROFILE", r"C:\Users\Default")) / "Vlas Pro Enterprise" / "config"
+CONFIG_PATH = CONFIG_DIR / "databases.json"
+LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
 
 class DatabaseSelectorDialog(QDialog):
     def __init__(self, parent=None):
@@ -24,54 +27,98 @@ class DatabaseSelectorDialog(QDialog):
         self.selected_config = None
 
         # Основний горизонтальний layout
-        main_layout = QHBoxLayout(self)
+        main_layout = QVBoxLayout(self)
 
         # Ліва частина: вертикальний layout для напису, списку та підпису знизу
         left_layout = QVBoxLayout()
+        # Якщо потрібно, розкоментуйте наступний рядок для заголовка над списком
         label = QLabel(localizer.t("form.database.select_label"))
-        left_layout.addWidget(label)
+        main_layout.addWidget(label)
 
         self.databases = self.load_databases()
+
         self.list_widget = QListWidget()
         self.list_widget.addItems(self.databases.keys())
         self.list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         left_layout.addWidget(self.list_widget)
 
-        # Додаємо підпис для відображення server#database
-        self.info_label = QLabel("")
-        left_layout.addWidget(self.info_label)
 
         # Оновлюємо info_label при зміні вибору
-        self.list_widget.currentItemChanged.connect(self.update_info_label)
-        self.update_info_label()
-
-        main_layout.addLayout(left_layout)
+        self.list_widget.currentItemChanged.connect(self.update_fields_on_selection)
+       # self.update_info_label()
 
         # Права частина: кнопки одна під одною
         button_layout = QVBoxLayout()
-        
-#        label = QLabel(localizer.t("form.database.select_label"))
-#        button_layout.addWidget(label)
 
-        self.confirm_btn = QPushButton(localizer.t("button.select"))
+        # --- Поле "Користувач" в один рядок ---
+        user_row = QHBoxLayout()
+        user_label = QLabel(localizer.t("form.database.user_label"))
+        self.user_combo = QComboBox()
+        self.user_combo.setEditable(True)
+        user_row.addWidget(user_label)
+        user_row.addWidget(self.user_combo)
+        button_layout.addLayout(user_row)
+
+        # --- Поле "Пароль" в один рядок ---
+        password_row = QHBoxLayout()
+        password_label = QLabel(localizer.t("form.database.password_label"))
+        self.password_edit = QLineEdit()
+        self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
+        password_row.addWidget(password_label)
+        password_row.addWidget(self.password_edit)
+        button_layout.addLayout(password_row)
+
+        # --- Встановлюємо однакову ширину для user_label та password_label ---
+        label_width = max(user_label.sizeHint().width(), password_label.sizeHint().width())
+        user_label.setFixedWidth(label_width)
+        password_label.setFixedWidth(label_width)
+
+        # Далі кнопки
+        self.login_btn = QPushButton(localizer.t("button.login"))
+
+        # Встановлюємо ширину login_btn як у user_combo
+        self.login_btn.setFixedWidth(self.user_combo.sizeHint().width())
+
+        # Додаємо login_btn у горизонтальний layout для вирівнювання вправо
+        login_row = QHBoxLayout()
+        login_row.addStretch()
+        login_row.addWidget(self.login_btn)
+        button_layout.addLayout(login_row)
+
         self.add_btn = QPushButton(localizer.t("button.add"))
         self.delete_btn = QPushButton(localizer.t("button.delete"))
 
-        self.confirm_btn.clicked.connect(self.confirm_selection)
+        self.login_btn.clicked.connect(self.login_database)
         self.add_btn.clicked.connect(self.add_database)
         self.delete_btn.clicked.connect(self.delete_database)
 
-        button_layout.addWidget(self.confirm_btn)
+        button_layout.addStretch()
         button_layout.addWidget(self.add_btn)
         button_layout.addWidget(self.delete_btn)
-        button_layout.addStretch()
 
-        button_widget = QWidget()
-        button_widget.setLayout(button_layout)
-        main_layout.addWidget(button_widget)
+        # Новий горизонтальний layout для лівої і правої частини
+        content_layout = QHBoxLayout()
+        content_layout.addLayout(left_layout)
+        content_layout.addLayout(button_layout)
+
+        main_layout.addLayout(content_layout)
+
+        # Додаємо підпис для відображення server#database
+        self.info_label = QLabel("")
+        # Встановлюємо останній вибраний елемент, якщо він є
+        last_selected = self.load_last_selected_db()
+        if last_selected and last_selected in self.databases:
+            items = self.list_widget.findItems(last_selected, Qt.MatchFlag.MatchExactly)
+            if items:
+                self.list_widget.setCurrentItem(items[0])
+        elif self.list_widget.count() > 0:
+            # Якщо не збережено або не знайдено — вибрати перший рядок
+            self.list_widget.setCurrentRow(0)
+            self.update_fields_on_selection()
+        main_layout.addWidget(self.info_label)
 
         self.setLayout(main_layout)
-        self.resize(400, 300)
+        self.resize(500, 400)
 
     def load_databases(self) -> dict[str, dict]:
         # Перевіряємо існування каталогу
@@ -97,15 +144,34 @@ class DatabaseSelectorDialog(QDialog):
         except Exception as e:
             QMessageBox.warning(self, "Помилка", f"Не вдалося зберегти бази: {e}")
 
-    def confirm_selection(self):
+    def login_database(self):
         selected_items = self.list_widget.selectedItems()
         if selected_items:
             db_name = selected_items[0].text()
             self.selected_config = self.databases.get(db_name)
+            self.save_last_selected_db(db_name)
         self.accept()
 
+    def load_last_selected_db(self) -> str | None:
+        try:
+            if LAST_SELECTED_PATH.exists():
+                with LAST_SELECTED_PATH.open("r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    return data.get("last_selected")
+        except Exception as e:
+            print(f"Помилка завантаження last_selected_db: {e}")
+        return None
+
+    def save_last_selected_db(self, db_name: str):
+        try:
+            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            with LAST_SELECTED_PATH.open("w", encoding="utf-8") as f:
+                json.dump({"last_selected": db_name}, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Помилка збереження last_selected_db: {e}")
+
     def add_database(self):
-        QMessageBox.information(self, self.windowTitle(), Localizer().t("msg.add_not_implemented"))
+        show_config_dialog(self)
 
     def delete_database(self):
         localizer = Localizer()
@@ -124,17 +190,50 @@ class DatabaseSelectorDialog(QDialog):
             self.save_databases()
             self.list_widget.clear()
             self.list_widget.addItems(self.databases.keys())
-            self.update_info_label()
+            self.update_fields_on_selection()
 
-    def update_info_label(self):
+    def update_fields_on_selection(self):
+
+        self.user_combo.clear()
+        self.info_label.clear()
+
         current_item = self.list_widget.currentItem()
-        if current_item:
-            db_name = current_item.text()
-            db = self.databases.get(db_name)
-            if db:
-                self.info_label.setText(f"{db['server']}#{db['database']}")
-                return
-        self.info_label.setText("")
+        if not current_item:
+            return
+
+        db_name = current_item.text()
+        db_info = self.databases.get(db_name, {})
+
+        # Встановлюємо користувача з поля "user" у файлі
+        server = db_info.get("server", "")
+        database = db_info.get("database", "")
+        user = db_info.get("user", "")
+        self.user_combo.clear()
+        if user:
+            self.user_combo.addItem(user)
+            self.user_combo.setCurrentText(user)
+        else:
+            self.user_combo.setCurrentText("")
+
+        if server and database:
+            self.info_label.setText(f"{server}#{database}")
+        else:
+            self.info_label.clear()
+
+        db_exists = False
+        if server and database and user:
+            db_exists = check_sql_database_exists(
+            server,
+            database,
+            user,
+            self.password_edit.text()
+            )
+
+        if  db_exists:
+            self.info_label.setStyleSheet("color: green;")
+        else:
+            self.info_label.setStyleSheet("color: red;")
+
 
 def select_database(parent=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)

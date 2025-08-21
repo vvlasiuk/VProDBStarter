@@ -34,6 +34,8 @@ def main():
 
     cfg = load_config()
     if not cfg:
+        return
+
         log_event("⚠️ Конфігурація відсутня — відкриваємо діалог")
         cfg = show_config_dialog()
         if cfg:
