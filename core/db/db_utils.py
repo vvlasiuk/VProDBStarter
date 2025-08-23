@@ -11,11 +11,12 @@ def is_sql_server_alive(cfg):
         return False
 
 def build_uri(cfg, use_master=False):
-    user = quote_plus(cfg['user'])
+    user     = quote_plus(cfg['user'])
     password = quote_plus(cfg['password'])
-    server = cfg['server']
+    server   = cfg['server']
     database = cfg['database'] if not use_master else 'master'
-    port = cfg['port']
+    port     = cfg['port']
+
     return (
         f"mssql+pyodbc://{user}:{password}@{server},{port}/{database}"
         "?driver=ODBC+Driver+17+for+SQL+Server"

@@ -10,10 +10,12 @@ from core.i18n.localizer import Localizer
 from core.db.db_utils import check_sql_database_exists
 from ui.forms.db_config_dialog import show_config_dialog
 from core.config_paths import CONFIG_DIR
+from cryptography.fernet import Fernet
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
 CONFIG_PATH = CONFIG_DIR / "databases.json"
 LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
+DB_CONFIG_CACHE = {}
 
 class DatabaseSelectorDialog(QDialog):
     def __init__(self, parent=None):
@@ -216,10 +218,11 @@ class DatabaseSelectorDialog(QDialog):
         db_info = self.databases.get(db_name, {})
 
         # Встановлюємо користувача з поля "user" у файлі
-        server = db_info.get("server", "")
+        server   = db_info.get("server", "")
         database = db_info.get("database", "")
-        user = db_info.get("user", "")
-        port = db_info.get("port", "")
+        user     = db_info.get("user", "")
+        port     = db_info.get("port", "")
+        password = ""
 
         self.user_combo.clear()
         if user:
@@ -233,21 +236,46 @@ class DatabaseSelectorDialog(QDialog):
         else:
             self.info_label.clear()
 
+        if database:
+            password = self.load_password_for_db(database)
+
         db_exists = False
-        if server and database and user and port:
-            db_cfg = {
+        if server and database and user and port and password:
+            DB_CONFIG_CACHE = {
                 "server": server,
                 "database": database,
                 "port": port,
-                "user": "sa",
-                "password": "123456"
+                "user": "sa_" + database,
+                "password": password    
             }
-            db_exists = check_sql_database_exists(db_cfg)
+            
+            db_exists = check_sql_database_exists(DB_CONFIG_CACHE)
+        else:
+            DB_CONFIG_CACHE = {}
 
         if  db_exists:
             self.info_label.setStyleSheet("color: green;")
         else:
             self.info_label.setStyleSheet("color: red;")
+
+    def load_password_for_db(self, db_id: str) -> str:
+        """
+        Завантажує та розшифровує пароль для бази за її id.
+        """
+        key = b'HvoeLHA3mgGxpyrrEl0w36H38P2ihb8XBENTJr-eNAM='
+        # Формуємо шлях до файлу з паролем
+        enc_path = CONFIG_DIR / "enc" / f"{db_id}.enc"
+        if not enc_path.exists():
+            return ""
+        fernet = Fernet(key)
+        with open(enc_path, "rb") as f:
+            encrypted = f.read()
+        try:
+            decrypted = fernet.decrypt(encrypted)
+            return json.loads(decrypted)[f"sa_{db_id}_pass"]
+        except Exception as e:
+            print(f"Помилка розшифрування пароля: {e}")
+            return ""
 
 def select_database(parent=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)

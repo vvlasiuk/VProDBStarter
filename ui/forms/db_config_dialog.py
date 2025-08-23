@@ -27,8 +27,8 @@ def show_config_dialog(parent=None):
     layout.addRow(localizer.t("label.server"), server)
     layout.addRow(localizer.t("label.port"), port)
     layout.addRow(localizer.t("label.database"), database)
-    layout.addRow(localizer.t("label.user"), user)
-    layout.addRow(localizer.t("label.password"), password)
+    layout.addRow(localizer.t("label.user_sa"), user)
+    layout.addRow(localizer.t("label.password_sa"), password)
 
     # --- Додаємо кнопки "Зберегти" та "Відмінити" поруч ---
     btn_layout = QHBoxLayout()

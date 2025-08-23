@@ -21,7 +21,9 @@
     "server": "Сервер:",
     "database": "База даних:",
     "user": "Користувач:",
-    "password": "Пароль:"
+    "password": "Пароль:",
+    "user_sa": "Користувач (sa):",
+    "password_sa": "Пароль (sa):"
   },
   "button": {
     "submit": "Увійти",
