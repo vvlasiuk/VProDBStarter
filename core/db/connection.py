@@ -1,6 +1,6 @@
 from sqlalchemy import create_engine
 from sqlalchemy.exc import OperationalError
-from core.db.initializer import build_uri
+from core.db.db_utils import build_uri
 
 def test_connection(cfg):
     try:

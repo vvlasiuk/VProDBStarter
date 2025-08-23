@@ -178,7 +178,7 @@ class DatabaseSelectorDialog(QDialog):
             self.list_widget.clear()
             self.list_widget.addItems(self.databases.keys())
             # Спозиціонуватися на доданій базі
-            db_name = result.get("database")
+            db_name = result.get("name")
             if db_name:
                 items = self.list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
                 if items:
@@ -219,6 +219,8 @@ class DatabaseSelectorDialog(QDialog):
         server = db_info.get("server", "")
         database = db_info.get("database", "")
         user = db_info.get("user", "")
+        port = db_info.get("port", "")
+
         self.user_combo.clear()
         if user:
             self.user_combo.addItem(user)
@@ -227,24 +229,25 @@ class DatabaseSelectorDialog(QDialog):
             self.user_combo.setCurrentText("")
 
         if server and database:
-            self.info_label.setText(f"{server}#{database}")
+            self.info_label.setText(f"{server}#{port}#{database}")
         else:
             self.info_label.clear()
 
         db_exists = False
-        if server and database and user:
-            db_exists = check_sql_database_exists(
-            server,
-            database,
-            user,
-            self.password_edit.text()
-            )
+        if server and database and user and port:
+            db_cfg = {
+                "server": server,
+                "database": database,
+                "port": port,
+                "user": "sa",
+                "password": "123456"
+            }
+            db_exists = check_sql_database_exists(db_cfg)
 
         if  db_exists:
             self.info_label.setStyleSheet("color: green;")
         else:
             self.info_label.setStyleSheet("color: red;")
-
 
 def select_database(parent=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)

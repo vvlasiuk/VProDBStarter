@@ -12,10 +12,12 @@
       "title": "VLAS PRO: Enterprise",
       "user_label": "Користувач:",
       "password_label": "Пароль:",
-      "select_label": "Оберіть ситему управління даними"
+      "select_label": "Оберіть робочий простір:"
     }
   },
   "label": {
+    "name": "Назва:",
+    "port": "Порт:",
     "server": "Сервер:",
     "database": "База даних:",
     "user": "Користувач:",

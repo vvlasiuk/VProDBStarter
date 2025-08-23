@@ -14,13 +14,18 @@ def show_config_dialog(parent=None):
 
     layout = QFormLayout()
 
+    name = QLineEdit()
     server = QLineEdit()
+    port = QLineEdit()
     database = QLineEdit()
     user = QLineEdit()
     password = QLineEdit()
+
     password.setEchoMode(QLineEdit.EchoMode.Password)
 
+    layout.addRow(localizer.t("label.name"), name)
     layout.addRow(localizer.t("label.server"), server)
+    layout.addRow(localizer.t("label.port"), port)
     layout.addRow(localizer.t("label.database"), database)
     layout.addRow(localizer.t("label.user"), user)
     layout.addRow(localizer.t("label.password"), password)
@@ -35,13 +40,12 @@ def show_config_dialog(parent=None):
 
     dialog.setLayout(layout)
 
-    # Шлях до databases.json (налаштуйте під свою структуру)
     CONFIG_PATH = CONFIG_DIR / "databases.json"
 
     def on_save():
-        # --- Створення бази даних, якщо не існує ---
         db_cfg = {
             "server": server.text(),
+            "port": port.text(),
             "database": database.text(),
             "user": user.text(),
             "password": password.text()
@@ -59,11 +63,12 @@ def show_config_dialog(parent=None):
         else:
             databases = {}
 
-        db_name = database.text()
+        db_name = name.text()
         # Додаємо/оновлюємо запис
         databases[db_name] = {
             "id": str(uuid.uuid4()),
             "server": server.text(),
+            "port": port.text(),
             "database": database.text(),
             "user": "Адміністратор"
             # Пароль не зберігаємо тут!
@@ -85,6 +90,7 @@ def show_config_dialog(parent=None):
     if dialog.exec():
         return {
             "server": server.text(),
+            "port": port.text(),
             "database": database.text(),
             "user": user.text(),
             "password": password.text()
