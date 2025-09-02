@@ -4,13 +4,14 @@ from pathlib import Path
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QWidget, QMessageBox, QLabel, QComboBox, QLineEdit
 )
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 from core.i18n.localizer import Localizer
 from core.db.db_utils import check_sql_database_exists
 from ui.forms.db_config_dialog import show_config_dialog
 from core.config_paths import CONFIG_DIR
-from cryptography.fernet import Fernet
+#from cryptography.fernet import Fernet
+from core.secure_config import load_password_for_db
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
 CONFIG_PATH = CONFIG_DIR / "databases.json"
@@ -222,7 +223,9 @@ class DatabaseSelectorDialog(QDialog):
         database = db_info.get("database", "")
         user     = db_info.get("user", "")
         port     = db_info.get("port", "")
-        password = ""
+        sa_password = ""
+        sa_user     = ""
+
 
         self.user_combo.clear()
         if user:
@@ -237,45 +240,46 @@ class DatabaseSelectorDialog(QDialog):
             self.info_label.clear()
 
         if database:
-            password = self.load_password_for_db(database)
+            creds = load_password_for_db(database)
+            sa_password = creds.get('pass', '')
+            sa_user     = creds.get('user', '')
 
-        db_exists = False
-        if server and database and user and port and password:
-            DB_CONFIG_CACHE = {
-                "server": server,
-                "database": database,
-                "port": port,
-                "user": "sa_" + database,
-                "password": password    
-            }
-            
-            db_exists = check_sql_database_exists(DB_CONFIG_CACHE)
-        else:
-            DB_CONFIG_CACHE = {}
+        def check_db():
+            # ця функція буде виконуватись у окремому потоці
+            def on_finished(db_exists):
+                self.user_combo.setEnabled(db_exists)
+                self.password_edit.setEnabled(db_exists)
+                self.login_btn.setEnabled(db_exists)
 
-        if  db_exists:
-            self.info_label.setStyleSheet("color: green;")
-        else:
-            self.info_label.setStyleSheet("color: red;")
+                if db_exists:
+                    self.info_label.setStyleSheet("color: green;")
+                else:
+                    self.info_label.setStyleSheet("color: red;")
 
-    def load_password_for_db(self, db_id: str) -> str:
-        """
-        Завантажує та розшифровує пароль для бази за її id.
-        """
-        key = b'HvoeLHA3mgGxpyrrEl0w36H38P2ihb8XBENTJr-eNAM='
-        # Формуємо шлях до файлу з паролем
-        enc_path = CONFIG_DIR / "enc" / f"{db_id}.enc"
-        if not enc_path.exists():
-            return ""
-        fernet = Fernet(key)
-        with open(enc_path, "rb") as f:
-            encrypted = f.read()
-        try:
-            decrypted = fernet.decrypt(encrypted)
-            return json.loads(decrypted)[f"sa_{db_id}_pass"]
-        except Exception as e:
-            print(f"Помилка розшифрування пароля: {e}")
-            return ""
+            if server and database and port and sa_password and sa_user:
+                cfg = {
+                    "server": server,
+                    "database": database,
+                    "port": port,
+                    "user": sa_user,
+                    "password": sa_password
+                }
+                self.db_thread = DBCheckThread(cfg)
+                self.db_thread.finished.connect(on_finished)
+                self.db_thread.start()
+            else:
+                on_finished(False)
+
+        check_db()  # ← ДОДАЙТЕ ЦЕЙ ВИКЛИК
+
+class DBCheckThread(QThread):
+    finished = pyqtSignal(bool)
+    def __init__(self, cfg):
+        super().__init__()
+        self.cfg = cfg
+    def run(self):
+        result = check_sql_database_exists(self.cfg)
+        self.finished.emit(result)
 
 def select_database(parent=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)

@@ -3,6 +3,16 @@ from sqlalchemy import create_engine, text
 from urllib.parse import quote_plus
 import socket
 
+def check_odbc_driver():
+    """Перевіряє, чи встановлений ODBC Driver 17 for SQL Server."""
+    drivers = [d for d in pyodbc.drivers()]
+    if "ODBC Driver 17 for SQL Server" not in drivers:
+        raise RuntimeError(
+            "ODBC Driver 17 for SQL Server не встановлений!\n"
+            "Завантажте та встановіть драйвер з:\n"
+            "https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server"
+        )
+    
 def is_sql_server_alive(cfg):
     try:
         with socket.create_connection((cfg['server'], cfg['port']), timeout=0.1):
@@ -21,7 +31,6 @@ def build_uri(cfg, use_master=False):
         f"mssql+pyodbc://{user}:{password}@{server},{port}/{database}"
         "?driver=ODBC+Driver+17+for+SQL+Server"
     )
-
 
 def check_sql_database_exists(cfg):
     """
