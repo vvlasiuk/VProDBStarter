@@ -1,7 +1,7 @@
 from config.config_manager import load_config, save_config
 from core.db.connection import test_connection
 from core.db.initializer import initialize_database
-from ui.forms.db_config_dialog import show_config_dialog
+# from ui.forms.db_config_dialog import show_config_dialog
 from ui.forms.db_selector_dialog import select_database
 from logs.logger import log_event
 

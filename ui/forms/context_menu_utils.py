@@ -73,9 +73,22 @@ def build_context_menu(parent=None) -> QMenu:
     edit_conn_action.setDefaultWidget(HoverMenuItem("assets/icons/settings.svg", "Змінити параметри підключення"))
     menu.addAction(edit_conn_action)
 
+    # "Додати до списку"
+    add_action = QWidgetAction(menu)
+    add_action.setDefaultWidget(HoverMenuItem("assets/icons/addToList.ico", "Додати до списку"))
+    menu.addAction(add_action)
+
     # "Видалити зі списку"
     delete_action = QWidgetAction(menu)
     delete_action.setDefaultWidget(HoverMenuItem("assets/icons/delete.svg", "Видалити зі списку"))
     menu.addAction(delete_action)
 
-    return menu, rename_action, delete_action, edit_conn_action
+    # Додаємо роздільник
+    menu.addSeparator()
+
+    # "Створити нову базу даних"
+    create_db_action = QWidgetAction(menu)
+    create_db_action.setDefaultWidget(HoverMenuItem("assets/icons/database_add.ico", "Створити нову базу даних"))
+    menu.addAction(create_db_action)
+
+    return menu, rename_action, delete_action, edit_conn_action, add_action, create_db_action
