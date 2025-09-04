@@ -24,7 +24,8 @@ def main():
 
     if not QApplication.instance():
         app = QApplication(sys.argv)
-        app.setStyle("WindowsVista") #Fusion
+        app.setStyle("Fusion") #WindowsVista
+
 
     cfg = select_database()
     if cfg:

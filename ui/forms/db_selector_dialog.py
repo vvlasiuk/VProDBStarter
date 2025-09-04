@@ -8,10 +8,13 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 from core.i18n.localizer import Localizer
 from core.db.db_utils import check_sql_database_exists
-from ui.forms.db_config_dialog import show_config_dialog
+from ui.forms.db_config_dialog import show_config_dialog, show_edit_config_dialog
 from core.config_paths import CONFIG_DIR
 #from cryptography.fernet import Fernet
 from core.secure_config import load_password_for_db
+from PyQt6.QtWidgets import QMenu, QInputDialog
+from collections import OrderedDict
+from ui.forms.context_menu_utils import build_context_menu
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
 CONFIG_PATH = CONFIG_DIR / "databases.json"
@@ -44,6 +47,9 @@ class DatabaseSelectorDialog(QDialog):
         self.list_widget.addItems(self.databases.keys())
         self.list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
         left_layout.addWidget(self.list_widget)
+        
+        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.list_widget.customContextMenuRequested.connect(self.show_list_context_menu)
 
 
         # Оновлюємо info_label при зміні вибору
@@ -194,12 +200,15 @@ class DatabaseSelectorDialog(QDialog):
             QMessageBox.warning(self, self.windowTitle(), localizer.t("msg.select_for_delete"))
             return
         db_name = selected_items[0].text()
-        reply = QMessageBox.question(
-            self, self.windowTitle(),
-            localizer.t("msg.confirm_delete").replace("{db}", db_name),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        if reply == QMessageBox.StandardButton.Yes:
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle("Підтвердження вилучення")
+        msg_box.setText(localizer.t("msg.confirm_delete").replace("{db}", db_name))
+        yes_button = msg_box.addButton("ТАК", QMessageBox.ButtonRole.YesRole)
+        no_button = msg_box.addButton("НІ", QMessageBox.ButtonRole.NoRole)
+        msg_box.setDefaultButton(yes_button)
+        msg_box.exec()
+
+        if msg_box.clickedButton() == yes_button:
             self.databases.pop(db_name, None)
             self.save_databases()
             self.list_widget.clear()
@@ -216,7 +225,10 @@ class DatabaseSelectorDialog(QDialog):
             return
 
         db_name = current_item.text()
-        db_info = self.databases.get(db_name, {})
+        #db_info = self.databases.get(db_name, {})
+        with CONFIG_PATH.open("r", encoding="utf-8") as f:
+            all_databases = json.load(f)
+        db_info = all_databases.get(db_name, {})
 
         # Встановлюємо користувача з поля "user" у файлі
         server   = db_info.get("server", "")
@@ -271,6 +283,61 @@ class DatabaseSelectorDialog(QDialog):
                 on_finished(False)
 
         check_db()  # ← ДОДАЙТЕ ЦЕЙ ВИКЛИК
+
+    def show_list_context_menu(self, pos):
+        item = self.list_widget.itemAt(pos)
+        if not item:
+            return
+
+        # Створюємо меню через build_context_menu (уніфікований стиль)
+        menu, rename_action, delete_action, edit_conn_action = build_context_menu(self)
+
+        action = menu.exec(self.list_widget.mapToGlobal(pos))
+        db_name = item.text()
+        if action == rename_action:
+            new_name, ok = QInputDialog.getText(self, "Змінити назву", "Нова назва:", text=db_name)
+            if ok and new_name and new_name != db_name:
+                # Зберігаємо позицію старого ключа
+                keys = list(self.databases.keys())
+                idx = keys.index(db_name)
+                value = self.databases.pop(db_name)
+                # Створюємо OrderedDict з новим ключем на тій же позиції
+                items = list(self.databases.items())
+                items.insert(idx, (new_name, value))
+                self.databases = OrderedDict(items)
+                self.save_databases()
+                self.list_widget.clear()
+                self.list_widget.addItems(self.databases.keys())
+                # Вибрати перейменований елемент
+                items = self.list_widget.findItems(new_name, Qt.MatchFlag.MatchExactly)
+                if items:
+                    self.list_widget.setCurrentItem(items[0])
+        elif action == delete_action:
+            msg_box = QMessageBox(self)
+            msg_box.setWindowTitle("Підтвердження вилучення")
+            msg_box.setText("Робочий простір буде вилучений зі списку. Ви впевнені?")
+            yes_button = msg_box.addButton("ТАК", QMessageBox.ButtonRole.YesRole)
+            no_button = msg_box.addButton("НІ", QMessageBox.ButtonRole.NoRole)
+            msg_box.setDefaultButton(yes_button)
+            msg_box.exec()
+
+            if msg_box.clickedButton() == yes_button:
+                self.databases.pop(db_name, None)
+                self.save_databases()
+                self.list_widget.clear()
+                self.list_widget.addItems(self.databases.keys())
+                self.update_fields_on_selection()
+        elif action == edit_conn_action:
+            result = show_edit_config_dialog(self, db_name)
+            if result:
+                # Спозиціонуватися на доданій базі
+                db_name = result.get("name")
+                self.update_fields_on_selection()
+                #if db_name:
+                #    items = self.list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
+                #    if items:
+                #        self.list_widget.setCurrentItem(items[0])
+
 
 class DBCheckThread(QThread):
     finished = pyqtSignal(bool)

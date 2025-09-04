@@ -96,3 +96,78 @@ def show_config_dialog(parent=None):
             "password": password.text()
         }
     return None
+
+def show_edit_config_dialog(parent=None, db_name=""):
+    localizer = Localizer()
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(localizer.t("form.config.title"))
+
+    layout = QFormLayout()
+
+    server = QLineEdit()
+    port = QLineEdit()
+    database = QLineEdit()
+
+    layout.addRow(localizer.t("label.server"), server)
+    layout.addRow(localizer.t("label.port"), port)
+    layout.addRow(localizer.t("label.database"), database)
+
+    # --- Додаємо кнопки "Зберегти" та "Відмінити" поруч ---
+    btn_layout = QHBoxLayout()
+    btn_save = QPushButton(localizer.t("button.save"))
+    btn_cancel = QPushButton(localizer.t("button.cancel"))
+    btn_layout.addWidget(btn_save)
+    btn_layout.addWidget(btn_cancel)
+    layout.addRow(btn_layout)
+
+    dialog.setLayout(layout)
+
+    CONFIG_PATH = CONFIG_DIR / "databases.json"
+
+    def on_save():
+        db_cfg = {
+            "server": server.text(),
+            "port": port.text(),
+            "database": database.text()
+        }
+
+        # Зчитуємо існуючі бази
+        if CONFIG_PATH.exists():
+            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                databases = json.load(f)
+        else:
+            databases = {}
+        # Оновлюємо дані для db_name, якщо такий є
+        if db_name and db_name in databases:
+            databases[db_name]["server"] = db_cfg["server"]
+            databases[db_name]["port"] = db_cfg["port"]
+            databases[db_name]["database"] = db_cfg["database"]
+
+            # Записуємо у файл
+            with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+                json.dump(databases, f, ensure_ascii=False, indent=2)
+        dialog.accept()  # ← ДОДАЙТЕ ЦЕ
+
+    def on_cancel():
+        dialog.reject()
+
+    btn_save.clicked.connect(on_save)
+    btn_cancel.clicked.connect(on_cancel)
+
+    # Перед dialog.exec()
+    if db_name and CONFIG_PATH.exists():
+        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+            databases = json.load(f)
+        if db_name in databases:
+            db = databases[db_name]
+            server.setText(db.get("server", ""))
+            port.setText(db.get("port", ""))
+            database.setText(db.get("database", ""))
+
+    if dialog.exec():
+        return {
+            "server": server.text(),
+            "port": port.text(),
+            "database": database.text()
+        }
+    return None
