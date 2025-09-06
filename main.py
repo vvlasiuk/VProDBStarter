@@ -51,14 +51,14 @@ def main():
         log_event("✅ Підключення успішне")
     else:
         log_event("❌ Підключення не вдалося — повторне введення")
-        cfg = show_config_dialog()
-        if cfg:
-            save_config(cfg)
-            initialize_database(cfg)
-            log_event("🛠️ База створена")
-        else:
-            log_event("❌ Вихід без конфігурації")
-            return
+        # cfg = show_config_dialog()
+        # if cfg:
+        #     save_config(cfg)
+        #     initialize_database(cfg)
+        #     log_event("🛠️ База створена")
+        # else:
+        #     log_event("❌ Вихід без конфігурації")
+        #     return
 
     launch_main_ui()
 

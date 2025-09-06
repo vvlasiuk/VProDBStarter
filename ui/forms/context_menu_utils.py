@@ -91,4 +91,9 @@ def build_context_menu(parent=None) -> QMenu:
     create_db_action.setDefaultWidget(HoverMenuItem("assets/icons/database_add.ico", "Створити нову базу даних"))
     menu.addAction(create_db_action)
 
-    return menu, rename_action, delete_action, edit_conn_action, add_action, create_db_action
+        # "Видалити базу даних"
+    delete_db_action = QWidgetAction(menu)
+    delete_db_action.setDefaultWidget(HoverMenuItem("assets/icons/database_remove.ico", "Видалити базу даних"))
+    menu.addAction(delete_db_action)
+
+    return menu, rename_action, delete_action, edit_conn_action, add_action, create_db_action, delete_db_action

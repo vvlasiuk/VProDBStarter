@@ -8,13 +8,14 @@ from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 from core.i18n.localizer import Localizer
 from core.db.db_utils import check_sql_database_exists
-from ui.forms.db_config_dialog import show_edit_config_dialog, show_add_config_dialog, show_create_db_dialog
+from ui.forms.db_config_dialog import show_edit_config_dialog, show_add_config_dialog, show_create_db_dialog, show_delete_db_dialog
 from core.config_paths import CONFIG_DIR
 #from cryptography.fernet import Fernet
 from core.secure_config import load_password_for_db
 from PyQt6.QtWidgets import QMenu, QInputDialog
 from collections import OrderedDict
 from ui.forms.context_menu_utils import build_context_menu
+from core.db.db_utils import fetch_users_list
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
 CONFIG_PATH = CONFIG_DIR / "databases.json"
@@ -95,15 +96,15 @@ class DatabaseSelectorDialog(QDialog):
         button_layout.addLayout(login_row)
 
         # self.add_btn = QPushButton(localizer.t("button.add"))
-        self.delete_btn = QPushButton(localizer.t("button.delete"))
+        # self.delete_btn = QPushButton(localizer.t("button.delete"))
 
         self.login_btn.clicked.connect(self.login_database)
         # self.add_btn.clicked.connect(self.add_database)
-        self.delete_btn.clicked.connect(self.delete_database)
+        # self.delete_btn.clicked.connect(self.delete_database)
 
         button_layout.addStretch()
         # button_layout.addWidget(self.add_btn)
-        button_layout.addWidget(self.delete_btn)
+        # button_layout.addWidget(self.delete_btn)
 
         # Новий горизонтальний layout для лівої і правої частини
         content_layout = QHBoxLayout()
@@ -179,42 +180,27 @@ class DatabaseSelectorDialog(QDialog):
         except Exception as e:
             print(f"Помилка збереження last_selected_db: {e}")
 
-    def add_database(self):
-        f=1
-        # result = show_config_dialog(self)
-        # if result:
-        #     # Оновити список баз
-        #     self.databases = self.load_databases()
-        #     self.list_widget.clear()
-        #     self.list_widget.addItems(self.databases.keys())
-        #     # Спозиціонуватися на доданій базі
-        #     db_name = result.get("name")
-        #     if db_name:
-        #         items = self.list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
-        #         if items:
-        #             self.list_widget.setCurrentItem(items[0])
+    # def delete_database(self):
+    #     localizer = Localizer()
+    #     selected_items = self.list_widget.selectedItems()
+    #     if not selected_items:
+    #         QMessageBox.warning(self, self.windowTitle(), localizer.t("msg.select_for_delete"))
+    #         return
+    #     db_name = selected_items[0].text()
+    #     msg_box = QMessageBox(self)
+    #     msg_box.setWindowTitle("Підтвердження вилучення")
+    #     msg_box.setText(localizer.t("msg.confirm_delete").replace("{db}", db_name))
+    #     yes_button = msg_box.addButton("ТАК", QMessageBox.ButtonRole.YesRole)
+    #     no_button = msg_box.addButton("НІ", QMessageBox.ButtonRole.NoRole)
+    #     msg_box.setDefaultButton(yes_button)
+    #     msg_box.exec()
 
-    def delete_database(self):
-        localizer = Localizer()
-        selected_items = self.list_widget.selectedItems()
-        if not selected_items:
-            QMessageBox.warning(self, self.windowTitle(), localizer.t("msg.select_for_delete"))
-            return
-        db_name = selected_items[0].text()
-        msg_box = QMessageBox(self)
-        msg_box.setWindowTitle("Підтвердження вилучення")
-        msg_box.setText(localizer.t("msg.confirm_delete").replace("{db}", db_name))
-        yes_button = msg_box.addButton("ТАК", QMessageBox.ButtonRole.YesRole)
-        no_button = msg_box.addButton("НІ", QMessageBox.ButtonRole.NoRole)
-        msg_box.setDefaultButton(yes_button)
-        msg_box.exec()
-
-        if msg_box.clickedButton() == yes_button:
-            self.databases.pop(db_name, None)
-            self.save_databases()
-            self.list_widget.clear()
-            self.list_widget.addItems(self.databases.keys())
-            self.update_fields_on_selection()
+    #     if msg_box.clickedButton() == yes_button:
+    #         self.databases.pop(db_name, None)
+    #         self.save_databases()
+    #         self.list_widget.clear()
+    #         self.list_widget.addItems(self.databases.keys())
+    #         self.update_fields_on_selection()
 
     def update_fields_on_selection(self):
 
@@ -287,14 +273,16 @@ class DatabaseSelectorDialog(QDialog):
 
     def show_list_context_menu(self, pos):
         item = self.list_widget.itemAt(pos)
-        if not item:
-            return
 
         # Створюємо меню через build_context_menu (уніфікований стиль)
-        menu, rename_action, delete_action, edit_conn_action, add_action, create_db_action = build_context_menu(self)
+        menu, rename_action, delete_action, edit_conn_action, add_action, create_db_action, delete_db_action = build_context_menu(self)
 
         action = menu.exec(self.list_widget.mapToGlobal(pos))
-        db_name = item.text()
+        if item:
+            db_name = item.text()
+        else: 
+            db_name = ""
+
         if action == rename_action:
             new_name, ok = QInputDialog.getText(self, "Змінити назву", "Нова назва:", text=db_name)
             if ok and new_name and new_name != db_name:
@@ -358,6 +346,8 @@ class DatabaseSelectorDialog(QDialog):
                     items = self.list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
                     if items:
                         self.list_widget.setCurrentItem(items[0])
+        elif action == delete_db_action:
+            result = show_delete_db_dialog(self, db_name)
 
 
 class DBCheckThread(QThread):
@@ -368,6 +358,12 @@ class DBCheckThread(QThread):
     def run(self):
         result = check_sql_database_exists(self.cfg)
         self.finished.emit(result)
+        if result:
+            users = fetch_users_list(self.cfg)
+            self.finished.emit(result)
+            if result and users:
+                self.parent().user_combo.clear()
+                self.parent().user_combo.addItems(users)
 
 def select_database(parent=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)

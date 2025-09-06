@@ -50,6 +50,8 @@ def check_sql_database_exists(cfg):
                 text("SELECT db_id(:db_name)"), {"db_name": db_name}
             )
             exists = result.scalar() is not None
+            conn.close()
+            engine.dispose()
         return exists
     except:
         return False
