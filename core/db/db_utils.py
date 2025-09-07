@@ -55,3 +55,20 @@ def check_sql_database_exists(cfg):
         return exists
     except:
         return False
+    
+def fetch_users_list(cfg):
+    """
+    Повертає список користувачів із таблиці Users.
+    """
+    uri = build_uri(cfg)
+    engine = create_engine(uri, future=True)
+    users = []
+    try:
+        with engine.connect() as conn:
+            result = conn.execute(text("SELECT Username FROM Users"))
+            users = [row[0] for row in result.fetchall()]
+            conn.close()
+            engine.dispose()
+    except Exception as e:
+        print(f"Помилка при отриманні списку користувачів: {e}")
+    return users

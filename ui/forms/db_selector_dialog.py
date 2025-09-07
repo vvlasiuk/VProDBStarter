@@ -7,7 +7,7 @@ from PyQt6.QtWidgets import (
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 from core.i18n.localizer import Localizer
-from core.db.db_utils import check_sql_database_exists
+from core.db.db_utils import check_sql_database_exists, fetch_users_list
 from ui.forms.db_config_dialog import show_edit_config_dialog, show_add_config_dialog, show_create_db_dialog, show_delete_db_dialog
 from core.config_paths import CONFIG_DIR
 #from cryptography.fernet import Fernet
@@ -226,12 +226,12 @@ class DatabaseSelectorDialog(QDialog):
         sa_user     = ""
 
 
-        self.user_combo.clear()
-        if user:
-            self.user_combo.addItem(user)
-            self.user_combo.setCurrentText(user)
-        else:
-            self.user_combo.setCurrentText("")
+        # self.user_combo.clear()
+        # if user:
+        #     self.user_combo.addItem(user)
+        #     self.user_combo.setCurrentText(user)
+        # else:
+        #     self.user_combo.setCurrentText("")
 
         if server and database:
             self.info_label.setText(f"{server}#{port}#{database}")
@@ -249,12 +249,19 @@ class DatabaseSelectorDialog(QDialog):
                 self.user_combo.setEnabled(db_exists)
                 self.password_edit.setEnabled(db_exists)
                 self.login_btn.setEnabled(db_exists)
-
                 if db_exists:
                     self.info_label.setStyleSheet("color: green;")
                 else:
                     self.info_label.setStyleSheet("color: red;")
 
+            def on_users_ready(users):
+                self.user_combo.clear()
+                if users:
+                    self.user_combo.addItems(users)
+                    self.user_combo.setCurrentText(users[0])
+                else:
+                    self.user_combo.setCurrentText("")
+                    
             if server and database and port and sa_password and sa_user:
                 cfg = {
                     "server": server,
@@ -263,8 +270,10 @@ class DatabaseSelectorDialog(QDialog):
                     "user": sa_user,
                     "password": sa_password
                 }
-                self.db_thread = DBCheckThread(cfg)
+                self.db_thread = DBCheckThread(cfg, self)
                 self.db_thread.finished.connect(on_finished)
+                # self.db_thread.finished.connect(self.db_thread.deleteLater)
+                self.db_thread.users_ready.connect(on_users_ready)
                 self.db_thread.start()
             else:
                 on_finished(False)
@@ -350,20 +359,27 @@ class DatabaseSelectorDialog(QDialog):
             result = show_delete_db_dialog(self, db_name)
 
 
+    # def closeEvent(self, event):
+    #     if hasattr(self, "db_thread") and self.db_thread.isRunning():
+    #         self.db_thread.quit()
+    #         self.db_thread.wait()
+    #     super().closeEvent(event)
+
 class DBCheckThread(QThread):
     finished = pyqtSignal(bool)
-    def __init__(self, cfg):
+    users_ready = pyqtSignal(list)  # Додаємо новий сигнал
+
+    def __init__(self, cfg, dialog):
         super().__init__()
         self.cfg = cfg
+        self.dialog = dialog
+
     def run(self):
         result = check_sql_database_exists(self.cfg)
         self.finished.emit(result)
         if result:
             users = fetch_users_list(self.cfg)
-            self.finished.emit(result)
-            if result and users:
-                self.parent().user_combo.clear()
-                self.parent().user_combo.addItems(users)
+            self.users_ready.emit(users)  # Передаємо список користувачів
 
 def select_database(parent=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)
