@@ -40,6 +40,7 @@ class DatabaseSelectorDialog(QDialog):
         left_layout = QVBoxLayout()
         # Якщо потрібно, розкоментуйте наступний рядок для заголовка над списком
         label = QLabel(localizer.t("form.database.select_label"))
+        label.setObjectName("select_db_label")
         main_layout.addWidget(label)
 
         self.databases = self.load_databases()
@@ -381,7 +382,11 @@ class DBCheckThread(QThread):
             users = fetch_users_list(self.cfg)
             self.users_ready.emit(users)  # Передаємо список користувачів
 
-def select_database(parent=None) -> dict | None:
+def select_database(parent=None, app=None, extensions=None) -> dict | None:
     dialog = DatabaseSelectorDialog(parent)
+    if extensions:
+        for ext in extensions:
+            if hasattr(ext, "on_app_start"):
+                ext.on_app_start(app, dialog)
     result = dialog.exec()
     return dialog.selected_config if result == QDialog.DialogCode.Accepted else None
