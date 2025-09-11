@@ -16,11 +16,6 @@ import argparse
 def launch_main_ui(extensions):
     app = QApplication(sys.argv)
     window = QWidget()
-    # window.setWindowTitle("VLAS PRO: Управлінський облік (client).")
-    # layout = QVBoxLayout()
-    # layout.addWidget(QLabel("✅ Підключення до бази даних успішне."))
-    # layout.addWidget(QLabel("🧠 Головний інтерфейс буде тут..."))
-    # window.setLayout(layout)
 
     # Викликаємо хуки розширень для UI
     for ext in extensions:
