@@ -23,7 +23,7 @@ LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
 DB_CONFIG_CACHE = {}
 
 class DatabaseSelectorDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, extensions=None):
         super().__init__(parent)
 
         localizer = Localizer()
@@ -131,6 +131,12 @@ class DatabaseSelectorDialog(QDialog):
         self.setLayout(main_layout)
         self.resize(500, 400)
 
+        # --- HOOK для плагінів ---
+        if extensions:
+            for ext in extensions:
+                if hasattr(ext, "customize_database_selector_dialog"):
+                    ext.customize_database_selector_dialog(self)
+
     def load_databases(self) -> dict[str, dict]:
         # Перевіряємо існування каталогу
         if not CONFIG_PATH.parent.exists():
@@ -181,28 +187,6 @@ class DatabaseSelectorDialog(QDialog):
         except Exception as e:
             print(f"Помилка збереження last_selected_db: {e}")
 
-    # def delete_database(self):
-    #     localizer = Localizer()
-    #     selected_items = self.list_widget.selectedItems()
-    #     if not selected_items:
-    #         QMessageBox.warning(self, self.windowTitle(), localizer.t("msg.select_for_delete"))
-    #         return
-    #     db_name = selected_items[0].text()
-    #     msg_box = QMessageBox(self)
-    #     msg_box.setWindowTitle("Підтвердження вилучення")
-    #     msg_box.setText(localizer.t("msg.confirm_delete").replace("{db}", db_name))
-    #     yes_button = msg_box.addButton("ТАК", QMessageBox.ButtonRole.YesRole)
-    #     no_button = msg_box.addButton("НІ", QMessageBox.ButtonRole.NoRole)
-    #     msg_box.setDefaultButton(yes_button)
-    #     msg_box.exec()
-
-    #     if msg_box.clickedButton() == yes_button:
-    #         self.databases.pop(db_name, None)
-    #         self.save_databases()
-    #         self.list_widget.clear()
-    #         self.list_widget.addItems(self.databases.keys())
-    #         self.update_fields_on_selection()
-
     def update_fields_on_selection(self):
 
         self.user_combo.clear()
@@ -213,7 +197,6 @@ class DatabaseSelectorDialog(QDialog):
             return
 
         db_name = current_item.text()
-        #db_info = self.databases.get(db_name, {})
         with CONFIG_PATH.open("r", encoding="utf-8") as f:
             all_databases = json.load(f)
         db_info = all_databases.get(db_name, {})
@@ -226,14 +209,6 @@ class DatabaseSelectorDialog(QDialog):
         sa_password = ""
         sa_user     = ""
 
-
-        # self.user_combo.clear()
-        # if user:
-        #     self.user_combo.addItem(user)
-        #     self.user_combo.setCurrentText(user)
-        # else:
-        #     self.user_combo.setCurrentText("")
-
         if server and database:
             self.info_label.setText(f"{server}#{port}#{database}")
         else:
@@ -245,7 +220,11 @@ class DatabaseSelectorDialog(QDialog):
             sa_user     = creds.get('user', '')
 
         def check_db():
-            # ця функція буде виконуватись у окремому потоці
+            # ДОДАЙТЕ ЦЕЙ БЛОК ПЕРЕД СТВОРЕННЯМ НОВОГО ПОТОКУ
+            if hasattr(self, "db_thread") and self.db_thread.isRunning():
+                self.db_thread.quit()
+                self.db_thread.wait()
+
             def on_finished(db_exists):
                 self.user_combo.setEnabled(db_exists)
                 self.password_edit.setEnabled(db_exists)
@@ -262,7 +241,7 @@ class DatabaseSelectorDialog(QDialog):
                     self.user_combo.setCurrentText(users[0])
                 else:
                     self.user_combo.setCurrentText("")
-                    
+
             if server and database and port and sa_password and sa_user:
                 cfg = {
                     "server": server,
@@ -273,7 +252,6 @@ class DatabaseSelectorDialog(QDialog):
                 }
                 self.db_thread = DBCheckThread(cfg, self)
                 self.db_thread.finished.connect(on_finished)
-                # self.db_thread.finished.connect(self.db_thread.deleteLater)
                 self.db_thread.users_ready.connect(on_users_ready)
                 self.db_thread.start()
             else:
@@ -359,12 +337,12 @@ class DatabaseSelectorDialog(QDialog):
         elif action == delete_db_action:
             result = show_delete_db_dialog(self, db_name)
 
-
-    # def closeEvent(self, event):
-    #     if hasattr(self, "db_thread") and self.db_thread.isRunning():
-    #         self.db_thread.quit()
-    #         self.db_thread.wait()
-    #     super().closeEvent(event)
+    def closeEvent(self, event):
+        # Якщо потік існує і ще працює — дочекатися завершення
+        if hasattr(self, "db_thread") and self.db_thread.isRunning():
+            self.db_thread.quit()
+            self.db_thread.wait()
+        super().closeEvent(event)
 
 class DBCheckThread(QThread):
     finished = pyqtSignal(bool)
@@ -382,11 +360,12 @@ class DBCheckThread(QThread):
             users = fetch_users_list(self.cfg)
             self.users_ready.emit(users)  # Передаємо список користувачів
 
-def select_database(parent=None, app=None, extensions=None) -> dict | None:
-    dialog = DatabaseSelectorDialog(parent)
-    if extensions:
-        for ext in extensions:
-            if hasattr(ext, "on_app_start"):
-                ext.on_app_start(app, dialog)
+def select_database(parent=None, extensions=None) -> dict | None:
+    # app = QApplication.instance()
+    dialog = DatabaseSelectorDialog(parent, extensions)
+    # if extensions:
+    #     for ext in extensions:
+    #         if hasattr(ext, "on_app_start"):
+    #             ext.on_app_start(app, dialog)
     result = dialog.exec()
     return dialog.selected_config if result == QDialog.DialogCode.Accepted else None

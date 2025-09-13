@@ -5,6 +5,7 @@ from core.db.initializer import initialize_database
 # from ui.forms.db_config_dialog import show_config_dialog
 from ui.forms.db_selector_dialog import select_database
 from logs.logger import log_event
+from dataclasses import dataclass
 
 from PyQt6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
 import sys
@@ -13,17 +14,15 @@ import importlib.util
 import os
 import argparse
 
-def launch_main_ui(extensions):
-    app = QApplication(sys.argv)
-    window = QWidget()
+@dataclass
+class AppConfig:
+    is_admin: bool
+    extensions: list
+    # інші поля...
 
-    # Викликаємо хуки розширень для UI
-    for ext in extensions:
-        if hasattr(ext, "on_app_start"):
-            ext.on_app_start(app, window)
-
-    window.show()
-    app.exec()
+def launch_main_ui(config):
+    app = QApplication.instance() 
+    app.setStyle("Fusion") #WindowsVista
 
 def load_extensions():
     extensions = []
@@ -39,8 +38,7 @@ def load_extensions():
                 extensions.append(mod)
     return extensions
 
-def main():
-
+def get_arg_parser():
     parser = argparse.ArgumentParser(description="Конфігуратор ERP-модуля")
     parser.add_argument(
         '--mode',
@@ -48,59 +46,65 @@ def main():
         required=True,
         help='Режим запуску: admin або user'
     )
+    return parser.parse_args()
 
-    args = parser.parse_args()
-
+def main():
+    args = get_arg_parser()
     extensions = load_extensions()
 
     if not QApplication.instance():
         app = QApplication(sys.argv)
         app.setStyle("Fusion") #WindowsVista
+        # window = QWidget()
+        # window.show()
 
-    app.setProperty("mode_admin", args.mode == "admin")
+    config = AppConfig(
+        is_admin=(args.mode == "admin"),
+        extensions=extensions
+    )
 
-    if app.property("mode_admin"):
+    if config.is_admin:
         log_event("Запуск в режимі адміністратора")
     else:
         log_event("Запуск в режимі користувача")
 
-    cfg = select_database(None, app, extensions)
-    if cfg:
-        log_event(f"✅ Базу обрано: {cfg['database']} на {cfg['server']}")
-        for ext in extensions:
-            if hasattr(ext, "on_database_selected"):
-                ext.on_database_selected(cfg)   
-    else:
-        log_event("❌ Базу не обрано — вихід")
-        return
+    cfg = select_database(None, config.extensions)
+    # if cfg:
+    #     log_event(f"✅ Базу обрано: {cfg['database']} на {cfg['server']}")
+    #     # for ext in config.extensions:
+    #     #     if hasattr(ext, "on_database_selected"):
+    #     #         ext.on_database_selected(cfg)   
+    # else:
+    #     log_event("❌ Базу не обрано — вихід")
+    #     return
 
-    cfg = load_config()
-    if not cfg:
-        return
+    # cfg = load_config()
+    # if not cfg:
+    #     return
 
-        log_event("⚠️ Конфігурація відсутня — відкриваємо діалог")
-        cfg = show_config_dialog()
-        if cfg:
-            save_config(cfg)
-            log_event("📥 Конфігурація збережена")
-        else:
-            log_event("❌ Немає конфігурації — вихід")
-            return
+    #     log_event("⚠️ Конфігурація відсутня — відкриваємо діалог")
+    #     cfg = show_config_dialog()
+    #     if cfg:
+    #         save_config(cfg)
+    #         log_event("📥 Конфігурація збережена")
+    #     else:
+    #         log_event("❌ Немає конфігурації — вихід")
+    #         return
 
-    if test_connection(cfg):
-        log_event("✅ Підключення успішне")
-    else:
-        log_event("❌ Підключення не вдалося — повторне введення")
-        # cfg = show_config_dialog()
-        # if cfg:
-        #     save_config(cfg)
-        #     initialize_database(cfg)
-        #     log_event("🛠️ База створена")
-        # else:
-        #     log_event("❌ Вихід без конфігурації")
-        #     return
+    # if test_connection(cfg):
+    #     log_event("✅ Підключення успішне")
+    # else:
+    #     log_event("❌ Підключення не вдалося — повторне введення")
+    #     # cfg = show_config_dialog()
+    #     # if cfg:
+    #     #     save_config(cfg)
+    #     #     initialize_database(cfg)
+    #     #     log_event("🛠️ База створена")
+    #     # else:
+    #     #     log_event("❌ Вихід без конфігурації")
+    #     #     return
 
-    launch_main_ui(extensions)
+    launch_main_ui(config)
 
 if __name__ == "__main__":
     main()
