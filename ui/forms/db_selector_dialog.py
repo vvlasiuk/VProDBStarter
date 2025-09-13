@@ -6,27 +6,25 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
-from core.i18n.localizer import Localizer
 from core.db.db_utils import check_sql_database_exists, fetch_users_list
 from ui.forms.db_config_dialog import show_edit_config_dialog, show_add_config_dialog, show_create_db_dialog, show_delete_db_dialog
 from core.config_paths import CONFIG_DIR
-#from cryptography.fernet import Fernet
 from core.secure_config import load_password_for_db
 from PyQt6.QtWidgets import QMenu, QInputDialog
 from collections import OrderedDict
 from ui.forms.context_menu_utils import build_context_menu
-from core.db.db_utils import fetch_users_list
+# from PyQt6.QtWidgets import QLabel
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
 CONFIG_PATH = CONFIG_DIR / "databases.json"
 LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
-DB_CONFIG_CACHE = {}
+# DB_CONFIG_CACHE = {}
 
 class DatabaseSelectorDialog(QDialog):
-    def __init__(self, parent=None, extensions=None):
+    def __init__(self, parent=None, config=None):
         super().__init__(parent)
 
-        localizer = Localizer()
+        localizer = config.localizer
 
         self.setWindowTitle(localizer.t("form.database.title")) 
         self.setWindowIcon(QIcon("assets/app_icon.ico"))
@@ -38,16 +36,17 @@ class DatabaseSelectorDialog(QDialog):
 
         # Ліва частина: вертикальний layout для напису, списку та підпису знизу
         left_layout = QVBoxLayout()
-        # Якщо потрібно, розкоментуйте наступний рядок для заголовка над списком
-        label = QLabel(localizer.t("form.database.select_label"))
-        label.setObjectName("select_db_label")
-        main_layout.addWidget(label)
+
+        select_label = QLabel(localizer.t("form.database.select_label"))
+        select_label.setObjectName("select_label")
+        main_layout.addWidget(select_label)
 
         self.databases = self.load_databases()
 
         self.list_widget = QListWidget()
         self.list_widget.addItems(self.databases.keys())
         self.list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.list_widget.setObjectName("database_list_widget")
         left_layout.addWidget(self.list_widget)
         
         self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -132,8 +131,8 @@ class DatabaseSelectorDialog(QDialog):
         self.resize(500, 400)
 
         # --- HOOK для плагінів ---
-        if extensions:
-            for ext in extensions:
+        if config.extensions:
+            for ext in config.extensions:
                 if hasattr(ext, "customize_database_selector_dialog"):
                     ext.customize_database_selector_dialog(self)
 
@@ -360,12 +359,18 @@ class DBCheckThread(QThread):
             users = fetch_users_list(self.cfg)
             self.users_ready.emit(users)  # Передаємо список користувачів
 
-def select_database(parent=None, extensions=None) -> dict | None:
-    # app = QApplication.instance()
-    dialog = DatabaseSelectorDialog(parent, extensions)
-    # if extensions:
-    #     for ext in extensions:
-    #         if hasattr(ext, "on_app_start"):
-    #             ext.on_app_start(app, dialog)
+def select_database(parent=None, config=None) -> dict | None:
+
+    dialog = DatabaseSelectorDialog(parent, config)
     result = dialog.exec()
+
     return dialog.selected_config if result == QDialog.DialogCode.Accepted else None
+
+
+# class CustomLabel(QLabel):
+#     def __init__(self, text="", object_name=None, style=None, parent=None):
+#         super().__init__(text, parent)
+#         if object_name:
+#             self.setObjectName(object_name)
+#         if style:
+#             self.setStyleSheet(style)
