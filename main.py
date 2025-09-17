@@ -1,11 +1,11 @@
-from config.config_manager import load_config, save_config
-from core.db.connection import test_connection
-from core.db.initializer import initialize_database
+# from config.config_manager import load_config, save_config
+# from core.db.connection import test_connection
+# from core.db.initializer import initialize_database
 from ui.forms.db_selector_dialog import select_database
 from logs.logger import log_event
 from dataclasses import dataclass
 
-from PyQt6.QtWidgets import QApplication, QLabel, QWidget, QVBoxLayout
+from PyQt6.QtWidgets import QApplication
 import sys
 import importlib
 import importlib.util

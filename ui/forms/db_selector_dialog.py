@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QWidget, QMessageBox, QLabel, QComboBox, QLineEdit
+    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QWidget, QMessageBox, QComboBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -13,6 +13,7 @@ from core.secure_config import load_password_for_db
 from PyQt6.QtWidgets import QMenu, QInputDialog
 from collections import OrderedDict
 from ui.forms.context_menu_utils import build_context_menu
+from ui.widgets.custom_widgets import CustomLabel
 # from PyQt6.QtWidgets import QLabel
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
@@ -31,15 +32,17 @@ class DatabaseSelectorDialog(QDialog):
         self.setModal(True)
         self.selected_config = None
 
-        # Основний горизонтальний layout
-        main_layout = QVBoxLayout(self)
+        
+        main_layout = QVBoxLayout(self) # Основний горизонтальний layout
 
-        # Ліва частина: вертикальний layout для напису, списку та підпису знизу
-        left_layout = QVBoxLayout()
+        left_layout = QVBoxLayout()   # Ліва частина: вертикальний layout
+        right_layout = QVBoxLayout()  # Права частина: вертикальний layout
 
-        select_label = QLabel(localizer.t("form.database.select_label"))
-        select_label.setObjectName("select_label")
-        main_layout.addWidget(select_label)
+        CustomLabel(
+            localizer.t("form.database.select_label"),
+            object_name="select_label",
+            layout=main_layout
+        )
 
         self.databases = self.load_databases()
 
@@ -55,28 +58,36 @@ class DatabaseSelectorDialog(QDialog):
 
         # Оновлюємо info_label при зміні вибору
         self.list_widget.currentItemChanged.connect(self.update_fields_on_selection)
-       # self.update_info_label()
 
-        # Права частина: кнопки одна під одною
-        button_layout = QVBoxLayout()
+        
+        user_row      = QHBoxLayout()  # Група "Користувач"
+        password_row  = QHBoxLayout()  # Група "Пароль"
 
-        # --- Поле "Користувач" в один рядок ---
-        user_row = QHBoxLayout()
-        user_label = QLabel(localizer.t("form.database.user_label"))
+        right_layout.addLayout(user_row)
+        right_layout.addLayout(password_row)
+
+        user_label = CustomLabel(
+            localizer.t("form.database.user_label"),
+            object_name="user_label",
+            layout=user_row
+        )
+
         self.user_combo = QComboBox()
         self.user_combo.setEditable(True)
-        user_row.addWidget(user_label)
         user_row.addWidget(self.user_combo)
-        button_layout.addLayout(user_row)
+        # button_layout.addLayout(user_row)
 
-        # --- Поле "Пароль" в один рядок ---
-        password_row = QHBoxLayout()
-        password_label = QLabel(localizer.t("form.database.password_label"))
+
+        password_label = CustomLabel(
+            localizer.t("form.database.password_label"),
+            object_name="password_label",
+            layout=password_row
+        )
+
         self.password_edit = QLineEdit()
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        password_row.addWidget(password_label)
+        # password_row.addWidget(password_label)
         password_row.addWidget(self.password_edit)
-        button_layout.addLayout(password_row)
 
         # --- Встановлюємо однакову ширину для user_label та password_label ---
         label_width = max(user_label.sizeHint().width(), password_label.sizeHint().width())
@@ -93,28 +104,26 @@ class DatabaseSelectorDialog(QDialog):
         login_row = QHBoxLayout()
         login_row.addStretch()
         login_row.addWidget(self.login_btn)
-        button_layout.addLayout(login_row)
-
-        # self.add_btn = QPushButton(localizer.t("button.add"))
-        # self.delete_btn = QPushButton(localizer.t("button.delete"))
+        right_layout.addLayout(login_row)
 
         self.login_btn.clicked.connect(self.login_database)
-        # self.add_btn.clicked.connect(self.add_database)
-        # self.delete_btn.clicked.connect(self.delete_database)
 
-        button_layout.addStretch()
-        # button_layout.addWidget(self.add_btn)
-        # button_layout.addWidget(self.delete_btn)
+        right_layout.addStretch()
 
         # Новий горизонтальний layout для лівої і правої частини
         content_layout = QHBoxLayout()
         content_layout.addLayout(left_layout)
-        content_layout.addLayout(button_layout)
+        content_layout.addLayout(right_layout)
 
         main_layout.addLayout(content_layout)
 
         # Додаємо підпис для відображення server#database
-        self.info_label = QLabel("")
+        self.info_label = CustomLabel(
+                "",
+                object_name="info_label",
+                layout=main_layout
+            )
+
         # Встановлюємо останній вибраний елемент, якщо він є
         last_selected = self.load_last_selected_db()
         if last_selected and last_selected in self.databases:
@@ -125,7 +134,6 @@ class DatabaseSelectorDialog(QDialog):
             # Якщо не збережено або не знайдено — вибрати перший рядок
             self.list_widget.setCurrentRow(0)
             self.update_fields_on_selection()
-        main_layout.addWidget(self.info_label)
 
         self.setLayout(main_layout)
         self.resize(500, 400)
@@ -367,10 +375,4 @@ def select_database(parent=None, config=None) -> dict | None:
     return dialog.selected_config if result == QDialog.DialogCode.Accepted else None
 
 
-# class CustomLabel(QLabel):
-#     def __init__(self, text="", object_name=None, style=None, parent=None):
-#         super().__init__(text, parent)
-#         if object_name:
-#             self.setObjectName(object_name)
-#         if style:
-#             self.setStyleSheet(style)
+
