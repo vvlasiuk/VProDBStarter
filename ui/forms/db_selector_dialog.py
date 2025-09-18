@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QWidget, QMessageBox, QComboBox, QLineEdit
+    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QMessageBox, QComboBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
@@ -14,18 +14,56 @@ from PyQt6.QtWidgets import QMenu, QInputDialog
 from collections import OrderedDict
 from ui.forms.context_menu_utils import build_context_menu
 from ui.widgets.custom_widgets import CustomLabel
-# from PyQt6.QtWidgets import QLabel
 
 # Визначаємо шлях до "Мої документи"\Vlas Pro Enterprise\config\databases.json
-CONFIG_PATH = CONFIG_DIR / "databases.json"
-LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
-# DB_CONFIG_CACHE = {}
+# CONFIG_PATH = CONFIG_DIR / "databases.json"
+# LAST_SELECTED_PATH = CONFIG_DIR / "last_selected_db.json"
+
+class DatabaseListWidget(QListWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self.setObjectName("database_list_widget")
+        self.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.databases = self.load_databases()
+
+    def load_databases(self) -> dict:
+        config_path = Path(self.config.config_path)
+        if not config_path.parent.exists():
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+        if not config_path.exists():
+            with config_path.open("w", encoding="utf-8") as f:
+                f.write("{}")
+            return {}
+        try:
+            with config_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Помилка завантаження баз: {e}")
+            return {}
+
+    def refresh(self, selected_db_name: str = None):
+         # Якщо ім'я бази не передано — отримати поточний вибір
+        if selected_db_name is None and self.currentItem():
+            selected_db_name = self.currentItem().text()
+ 
+        self.databases = self.load_databases()
+        self.clear()
+        self.addItems(self.databases.keys())
+       
+        # Спозиціонуватися на доданій базі
+        if selected_db_name:
+            items = self.database_list_widget.findItems(selected_db_name, Qt.MatchFlag.MatchExactly)
+            if items:
+                self.database_list_widget.setCurrentItem(items[0])
 
 class DatabaseSelectorDialog(QDialog):
     def __init__(self, parent=None, config=None):
         super().__init__(parent)
 
         localizer = config.localizer
+
+        self.config = config
 
         self.setWindowTitle(localizer.t("form.database.title")) 
         self.setWindowIcon(QIcon("assets/app_icon.ico"))
@@ -44,22 +82,19 @@ class DatabaseSelectorDialog(QDialog):
             layout=main_layout
         )
 
-        self.databases = self.load_databases()
+        # self.databases = self.load_databases()
 
-        self.list_widget = QListWidget()
-        self.list_widget.addItems(self.databases.keys())
-        self.list_widget.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self.list_widget.setObjectName("database_list_widget")
-        left_layout.addWidget(self.list_widget)
-        
-        self.list_widget.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.list_widget.customContextMenuRequested.connect(self.show_list_context_menu)
+        self.database_list_widget = DatabaseListWidget()
 
+        # self.list_widget = QListWidget()
+        self.database_list_widget.addItems(self.databases.keys())
+        left_layout.addWidget(self.database_list_widget)
+
+        self.database_list_widget.customContextMenuRequested.connect(self.show_list_context_menu)
 
         # Оновлюємо info_label при зміні вибору
-        self.list_widget.currentItemChanged.connect(self.update_fields_on_selection)
+        self.database_list_widget.currentItemChanged.connect(self.update_fields_on_selection)
 
-        
         user_row      = QHBoxLayout()  # Група "Користувач"
         password_row  = QHBoxLayout()  # Група "Пароль"
 
@@ -75,8 +110,6 @@ class DatabaseSelectorDialog(QDialog):
         self.user_combo = QComboBox()
         self.user_combo.setEditable(True)
         user_row.addWidget(self.user_combo)
-        # button_layout.addLayout(user_row)
-
 
         password_label = CustomLabel(
             localizer.t("form.database.password_label"),
@@ -86,7 +119,6 @@ class DatabaseSelectorDialog(QDialog):
 
         self.password_edit = QLineEdit()
         self.password_edit.setEchoMode(QLineEdit.EchoMode.Password)
-        # password_row.addWidget(password_label)
         password_row.addWidget(self.password_edit)
 
         # --- Встановлюємо однакову ширину для user_label та password_label ---
@@ -125,7 +157,7 @@ class DatabaseSelectorDialog(QDialog):
             )
 
         # Встановлюємо останній вибраний елемент, якщо він є
-        last_selected = self.load_last_selected_db()
+        last_selected = self.load_last_selected_db(config)
         if last_selected and last_selected in self.databases:
             items = self.list_widget.findItems(last_selected, Qt.MatchFlag.MatchExactly)
             if items:
@@ -144,26 +176,27 @@ class DatabaseSelectorDialog(QDialog):
                 if hasattr(ext, "customize_database_selector_dialog"):
                     ext.customize_database_selector_dialog(self)
 
-    def load_databases(self) -> dict[str, dict]:
-        # Перевіряємо існування каталогу
-        if not CONFIG_PATH.parent.exists():
-            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        # Перевіряємо існування файлу, якщо нема — створюємо порожній файл
-        if not CONFIG_PATH.exists():
-            with CONFIG_PATH.open("w", encoding="utf-8") as f:
-                f.write("{}")
-            return {}
-        try:
-            with CONFIG_PATH.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
+    # def load_databases(self) -> dict[str, dict]:
+    #     # Перевіряємо існування каталогу
+    #     config_path = Path(self.config.config_path)
+    #     if not config_path.parent.exists():
+    #         config_path.parent.mkdir(parents=True, exist_ok=True)
+    #     if not config_path.exists():
+    #         with config_path.open("w", encoding="utf-8") as f:
+    #             f.write("{}")
+    #         return {}
+    #     try:
+    #         with config_path.open("r", encoding="utf-8") as f:
+    #             return json.load(f)
+    #     except Exception as e:
             print(f"Помилка завантаження баз: {e}")
             return {}
 
-    def save_databases(self):
+    def save_databases(self, config):
+        config_path = Path(config.config_path)
         try:
-            CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-            with CONFIG_PATH.open("w", encoding="utf-8") as f:
+            config_path.parent.mkdir(parents=True, exist_ok=True)
+            with config_path.open("w", encoding="utf-8") as f:
                 json.dump(self.databases, f, ensure_ascii=False, indent=2)
         except Exception as e:
             QMessageBox.warning(self, "Помилка", f"Не вдалося зберегти бази: {e}")
@@ -176,10 +209,11 @@ class DatabaseSelectorDialog(QDialog):
             self.save_last_selected_db(db_name)
         self.accept()
 
-    def load_last_selected_db(self) -> str | None:
+    def load_last_selected_db(self, config) -> str | None:
+        last_selected_path = Path(config.last_selected_path)
         try:
-            if LAST_SELECTED_PATH.exists():
-                with LAST_SELECTED_PATH.open("r", encoding="utf-8") as f:
+            if last_selected_path.exists():
+                with last_selected_path.open("r", encoding="utf-8") as f:
                     data = json.load(f)
                     return data.get("last_selected")
         except Exception as e:
@@ -187,9 +221,10 @@ class DatabaseSelectorDialog(QDialog):
         return None
 
     def save_last_selected_db(self, db_name: str):
+        last_selected_path = Path(self.config.last_selected_path)
         try:
-            CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-            with LAST_SELECTED_PATH.open("w", encoding="utf-8") as f:
+            last_selected_path.parent.mkdir(parents=True, exist_ok=True)
+            with last_selected_path.open("w", encoding="utf-8") as f:
                 json.dump({"last_selected": db_name}, f, ensure_ascii=False, indent=2)
         except Exception as e:
             print(f"Помилка збереження last_selected_db: {e}")
@@ -199,12 +234,12 @@ class DatabaseSelectorDialog(QDialog):
         self.user_combo.clear()
         self.info_label.clear()
 
-        current_item = self.list_widget.currentItem()
+        current_item = self.database_list_widget.currentItem()
         if not current_item:
             return
 
         db_name = current_item.text()
-        with CONFIG_PATH.open("r", encoding="utf-8") as f:
+        with Path(self.config.config_path).open("r", encoding="utf-8") as f:
             all_databases = json.load(f)
         db_info = all_databases.get(db_name, {})
 
@@ -267,12 +302,12 @@ class DatabaseSelectorDialog(QDialog):
         check_db()  # ← ДОДАЙТЕ ЦЕЙ ВИКЛИК
 
     def show_list_context_menu(self, pos):
-        item = self.list_widget.itemAt(pos)
+        item = self.database_list_widget.itemAt(pos)
 
         # Створюємо меню через build_context_menu (уніфікований стиль)
         menu, rename_action, delete_action, edit_conn_action, add_action, create_db_action, delete_db_action = build_context_menu(self)
 
-        action = menu.exec(self.list_widget.mapToGlobal(pos))
+        action = menu.exec(self.database_list_widget.mapToGlobal(pos))
         if item:
             db_name = item.text()
         else: 
@@ -293,7 +328,7 @@ class DatabaseSelectorDialog(QDialog):
                 self.list_widget.clear()
                 self.list_widget.addItems(self.databases.keys())
                 # Вибрати перейменований елемент
-                items = self.list_widget.findItems(new_name, Qt.MatchFlag.MatchExactly)
+                items = self.database_list_widget.findItems(new_name, Qt.MatchFlag.MatchExactly)
                 if items:
                     self.list_widget.setCurrentItem(items[0])
         elif action == delete_action:
@@ -308,8 +343,8 @@ class DatabaseSelectorDialog(QDialog):
             if msg_box.clickedButton() == yes_button:
                 self.databases.pop(db_name, None)
                 self.save_databases()
-                self.list_widget.clear()
-                self.list_widget.addItems(self.databases.keys())
+                self.database_list_widget.clear()
+                self.database_list_widget.addItems(self.databases.keys())
                 self.update_fields_on_selection()
         elif action == edit_conn_action:
             result = show_edit_config_dialog(self, db_name)
@@ -326,21 +361,23 @@ class DatabaseSelectorDialog(QDialog):
                 self.list_widget.addItems(self.databases.keys())
                 items = self.list_widget.findItems(result.get("name"), Qt.MatchFlag.MatchExactly)
                 if items:
-                    self.list_widget.setCurrentItem(items[0])
+                    self.database_list_widget.setCurrentItem(items[0])
                     self.update_fields_on_selection()
         elif action == create_db_action:
             result = show_create_db_dialog(self)
             if result:
                 # Оновити список баз
-                self.databases = self.load_databases()
-                self.list_widget.clear()
-                self.list_widget.addItems(self.databases.keys())
-                # Спозиціонуватися на доданій базі
-                db_name = result.get("name")
-                if db_name:
-                    items = self.list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
-                    if items:
-                        self.list_widget.setCurrentItem(items[0])
+                # self.databases = self.load_databases()
+                # self.database_list_widget.clear()
+                # self.database_list_widget.addItems(self.databases.keys())
+                self.database_list_widget.refresh(result.get("name"))
+
+                # # Спозиціонуватися на доданій базі
+                # db_name = result.get("name")
+                # if db_name:
+                #     items = self.database_list_widget.findItems(db_name, Qt.MatchFlag.MatchExactly)
+                #     if items:
+                #         self.database_list_widget.setCurrentItem(items[0])
         elif action == delete_db_action:
             result = show_delete_db_dialog(self, db_name)
 
