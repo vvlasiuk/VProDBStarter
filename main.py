@@ -18,7 +18,7 @@ from core.i18n.localizer import Localizer
 class AppConfig:
     is_admin: bool
     extensions: list
-    config_path: str
+    databases_list_path: str
     last_selected_path: str
     localizer: Localizer
 
@@ -56,13 +56,13 @@ def main():
     config = AppConfig(
         is_admin=(args.mode == "admin"),
         extensions=extensions,
-        config_path=str(CONFIG_DIR / "databases.json"),
+        databases_list_path =str(CONFIG_DIR / "databases.json"),
         last_selected_path=str(CONFIG_DIR / "last_selected_db.json"),
         localizer=Localizer()
     )
 
     if config.is_admin:
-        log_event("Запуск в режимі адміністратора")
+        log_event(config.localizer.t("log.admin_mode"))
 
     select_database(None, config)
 

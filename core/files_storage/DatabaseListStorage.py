@@ -1,0 +1,65 @@
+import json
+from pathlib import Path
+from collections import OrderedDict
+
+class DatabaseListStorage:
+    def __init__(self, databases_list_path):
+        self.databases_list_path = Path(databases_list_path)
+        self.ensure_file_exists()
+
+    def ensure_file_exists(self):
+        # Цей метод перевіряє, чи існує папка та файл для зберігання списку баз.
+        # Якщо папка не існує — створює її.
+        # Якщо файл не існує — створює порожній файл з вмістом {} (порожній JSON-об'єкт).
+        if not self.databases_list_path.parent.exists():
+            self.databases_list_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.databases_list_path.exists():
+            with self.databases_list_path.open("w", encoding="utf-8") as f:
+                f.write("{}")
+
+    def get_db_info(self, db_name: str) -> dict:
+        # Повертає словник з інформацією про базу за її ім'ям.
+        all_databases = self.load()
+        return all_databases.get(db_name, {})
+
+    def load(self) -> dict:
+        try:
+            with self.databases_list_path.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            print(f"Помилка завантаження баз: {e}")
+            return {}
+
+    def save(self, databases: dict):
+        try:
+            with self.databases_list_path.open("w", encoding="utf-8") as f:
+                json.dump(databases, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Помилка збереження баз: {e}")
+
+    def rename(self, old_name: str, new_name: str):
+        databases = self.load()
+        if old_name in databases and new_name not in databases:
+            keys = list(databases.keys())
+            idx = keys.index(old_name)
+            value = databases.pop(old_name)
+            items = list(databases.items())
+            items.insert(idx, (new_name, value))
+            databases = OrderedDict(items)
+            self.save(databases)
+            return True
+        return False
+
+    # def delete(self, db_name: str):
+    #     databases = self.load()
+    #     if db_name in databases:
+    #         databases.pop(db_name)
+    #         self.save(databases)
+    #         return True
+    #     return False
+
+    # def add(self, db_name: str, db_info: dict):
+    #     databases = self.load()
+    #     databases[db_name] = db_info
+    #     self.save(databases)
+    #     return True
