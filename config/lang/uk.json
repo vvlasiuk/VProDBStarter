@@ -49,5 +49,19 @@
     "add_not_implemented": "Додавання нової бази ще не реалізовано.",
     "select_for_delete": "Оберіть базу для видалення.",
     "confirm_delete": "Ви впевнені, що хочете видалити базу '{db}'?"
+  },
+"dialog": {
+  "confirm": {
+    "default_title": "Підтвердження",
+    "default_text": "Ви впевнені?",
+    "default_yes": "ТАК",
+    "default_no": "НІ",
+    "delete_title": "Підтвердження вилучення",
+    "delete_workspace_text": "Робочий простір \"{name}\" буде вилучений зі списку. Ви впевнені?"
+  },
+"rename": {
+    "title": "Змінити назву",
+    "label": "Нова назва:"
+    }
   }
-}
+}  

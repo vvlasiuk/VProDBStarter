@@ -50,16 +50,48 @@ class DatabaseListStorage:
             return True
         return False
 
-    # def delete(self, db_name: str):
-    #     databases = self.load()
-    #     if db_name in databases:
-    #         databases.pop(db_name)
-    #         self.save(databases)
-    #         return True
-    #     return False
+    def delete(self, db_name: str):
+        databases = self.load()
+        if db_name in databases:
+            databases.pop(db_name, None)
+            self.save(databases)
+            return True
+        return False
 
     # def add(self, db_name: str, db_info: dict):
     #     databases = self.load()
     #     databases[db_name] = db_info
     #     self.save(databases)
     #     return True
+
+class LastSelectedDbStorage:
+    def __init__(self, last_selected_db_path):
+        self.last_selected_db_path = Path(last_selected_db_path)
+        self.ensure_file_exists()
+
+    def ensure_file_exists(self):
+        if not self.last_selected_db_path.parent.exists():
+            self.last_selected_db_path.parent.mkdir(parents=True, exist_ok=True)
+        if not self.last_selected_db_path.exists():
+            with self.last_selected_db_path.open("w", encoding="utf-8") as f:
+                f.write("{}")
+
+    def load(self) -> dict:
+        try:
+            with self.last_selected_db_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                return {
+                    "db_id": data.get("db_id", None),
+                    "user": data.get("user", None)
+                }
+        except Exception as e:
+            print(f"Помилка завантаження last_selected_db: {e}")
+        return None
+
+    def save(self, db_id: str, db_user: str):
+        try:
+            with self.last_selected_db_path.open("w", encoding="utf-8") as f:
+                json.dump({"db_id": db_id, "user": db_user}, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            print(f"Помилка збереження last_selected_db: {e}")
+        return None

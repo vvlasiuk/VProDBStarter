@@ -19,7 +19,7 @@ class AppConfig:
     is_admin: bool
     extensions: list
     databases_list_path: str
-    last_selected_path: str
+    last_selected_db_path: str
     localizer: Localizer
 
 def load_extensions() -> list:
@@ -57,7 +57,7 @@ def main():
         is_admin=(args.mode == "admin"),
         extensions=extensions,
         databases_list_path =str(CONFIG_DIR / "databases.json"),
-        last_selected_path=str(CONFIG_DIR / "last_selected_db.json"),
+        last_selected_db_path=str(CONFIG_DIR / "last_selected_db.json"),
         localizer=Localizer()
     )
 

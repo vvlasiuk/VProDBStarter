@@ -221,10 +221,11 @@ def show_add_config_dialog(parent=None):
         db_name = name.text()
         if db_name:
             databases[db_name] = {
+                "id": str(uuid.uuid4()),
                 "server": db_cfg["server"],
                 "port": db_cfg["port"],
-                "database": db_cfg["database"],
-                "name": db_name  # Додаємо поле "Назва"
+                "database": db_cfg["database"]
+                # "name": db_name, 
             }
             with open(CONFIG_PATH, "w", encoding="utf-8") as f:
                 json.dump(databases, f, ensure_ascii=False, indent=2)
