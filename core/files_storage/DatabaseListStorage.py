@@ -22,6 +22,18 @@ class DatabaseListStorage:
         all_databases = self.load()
         return all_databases.get(db_name, {})
 
+    def get_db_info_by_id(self, db_id: str) -> dict | None:
+        if db_id is None:
+            return None
+        
+        all_databases = self.load()
+        for db_name, db_info in all_databases.items():
+            if db_info.get("id") == db_id:
+                db_info_with_name = db_info.copy()
+                db_info_with_name["name"] = db_name
+                return db_info_with_name
+        return None    
+
     def load(self) -> dict:
         try:
             with self.databases_list_path.open("r", encoding="utf-8") as f:

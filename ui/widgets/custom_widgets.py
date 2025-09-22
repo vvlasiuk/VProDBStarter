@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QHBoxLayout, QMessageBox
+from PyQt6.QtWidgets import QLabel, QPushButton, QComboBox, QInputDialog, QMessageBox
 
 class CustomLabel(QLabel):
     def __init__(self, text="", object_name=None, style=None, parent=None, layout=None):
@@ -63,3 +63,15 @@ class ConfirmDialog(QMessageBox):
     def exec_and_confirm(self):
         self.exec()
         return self.clickedButton() == self.yes_button
+    
+
+class CustomInputDialog(QInputDialog):
+    @staticmethod
+    def get_text(parent, localizer=None, title=None, label=None, text=""):
+        # if localizer:
+        #     title = title or localizer.t("dialog.rename.title")
+        #     label = label or localizer.t("dialog.rename.label")
+        # else:
+        #     title = title or "Змінити назву"
+        #     label = label or "Нова назва:"
+        return QInputDialog.getText(parent, title, label, text=text)    

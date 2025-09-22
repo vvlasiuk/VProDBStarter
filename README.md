@@ -1,4 +1,4 @@
 VLAS PRO: Enterprise
-V00.001 Sales Analytics
+V00.001 VProDBStarter
 
 Автор: Власюк Володимир Анатолійович

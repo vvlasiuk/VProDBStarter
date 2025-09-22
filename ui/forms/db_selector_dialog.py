@@ -1,19 +1,18 @@
-import os
-import json
-from pathlib import Path
+# import os
+# import json
+# from pathlib import Path
 from PyQt6.QtWidgets import (
-    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QMessageBox, QComboBox, QLineEdit
+    QDialog, QVBoxLayout, QHBoxLayout, QListWidget, QPushButton, QComboBox, QLineEdit
 )
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QIcon
 from core.db.db_utils import check_sql_database_exists, fetch_users_list
 from ui.forms.db_config_dialog import show_edit_config_dialog, show_add_config_dialog, show_create_db_dialog, show_delete_db_dialog
-# from core.config_paths import CONFIG_DIR
 from core.secure_config import load_password_for_db
 from PyQt6.QtWidgets import QMenu, QInputDialog
-from collections import OrderedDict
+# from collections import OrderedDict
 from ui.forms.context_menu_utils import build_context_menu
-from ui.widgets.custom_widgets import ConfirmDialog, CustomLabel
+from ui.widgets.custom_widgets import ConfirmDialog, CustomInputDialog, CustomLabel
 from core.files_storage.DatabaseListStorage import DatabaseListStorage, LastSelectedDbStorage
 
 class DatabaseListWidget(QListWidget):
@@ -43,16 +42,7 @@ class DatabaseListWidget(QListWidget):
         return self.db_list_storage.get_db_info(db_name)
 
     def get_db_info_by_id(self, db_id: str) -> dict | None:
-        if db_id is None:
-            return None
-        
-        all_databases = self.load_databases()
-        for db_name, db_info in all_databases.items():
-            if db_info.get("id") == db_id:
-                db_info_with_name = db_info.copy()
-                db_info_with_name["name"] = db_name
-                return db_info_with_name
-        return None    
+        return self.db_list_storage.get_db_info_by_id(db_id)
     
     def load_last_selected_db(self) -> str | None:
         return self.last_selected_db_storage.load()
@@ -81,7 +71,15 @@ class DatabaseListWidget(QListWidget):
         action = menu.exec(self.mapToGlobal(pos))
 
         if action == rename_action:
-            new_name, ok = QInputDialog.getText(self, localizer.t("dialog.rename.title"), localizer.t("dialog.rename.label"), text=db_name)            
+            # new_name, ok = QInputDialog.getText(self, localizer.t("dialog.rename.title"), localizer.t("dialog.rename.label"), text=db_name)            
+            new_name, ok = CustomInputDialog.get_text(
+                self,
+                # localizer=localizer,
+                title=localizer.t("dialog.rename.title"),
+                label=localizer.t("dialog.rename.label"),
+                text=db_name
+            )
+
             if ok and new_name and new_name != db_name:
                 self.db_list_storage.rename(db_name, new_name)
                 self.refresh(selected_db_name=new_name)
@@ -130,8 +128,6 @@ class DatabaseListWidget(QListWidget):
                         selected_db_name = db_info.get("name", None)
                     
                     self.db_selector_dialog.last_selected_user = last_selected_db.get("user", None)
-                    # if last_user:
-                    #     self.db_selector_dialog.user_combo.setCurrentText(last_user)
 
         self.clear()
         self.databases = self.load_databases()
@@ -250,14 +246,14 @@ class DatabaseSelectorDialog(QDialog):
                 if hasattr(ext, "customize_database_selector_dialog"):
                     ext.customize_database_selector_dialog(self)
 
-    def save_databases(self, config):
-        config_path = Path(config.config_path)
-        try:
-            config_path.parent.mkdir(parents=True, exist_ok=True)
-            with config_path.open("w", encoding="utf-8") as f:
-                json.dump(self.databases, f, ensure_ascii=False, indent=2)
-        except Exception as e:
-            QMessageBox.warning(self, "Помилка", f"Не вдалося зберегти бази: {e}")
+    # def save_databases(self, config):
+    #     config_path = Path(config.config_path)
+    #     try:
+    #         config_path.parent.mkdir(parents=True, exist_ok=True)
+    #         with config_path.open("w", encoding="utf-8") as f:
+    #             json.dump(self.databases, f, ensure_ascii=False, indent=2)
+    #     except Exception as e:
+    #         QMessageBox.warning(self, "Помилка", f"Не вдалося зберегти бази: {e}")
 
     def login_database(self):
         db_name = self.database_list_widget.get_current_db_name()
@@ -273,20 +269,18 @@ class DatabaseSelectorDialog(QDialog):
         self.user_combo.clear()
         self.info_label.clear()
 
-        current_item = self.database_list_widget.currentItem()
-        if not current_item:
-            return
 
-        db_name = current_item.text()
+        db_name = self.database_list_widget.get_current_db_name()
+        if not db_name:
+            return
         db_info = self.database_list_widget.get_db_info(db_name)
 
         # Встановлюємо користувача з поля "user" у файлі
         server   = db_info.get("server", "")
         database = db_info.get("database", "")
-        user     = db_info.get("user", "")
         port     = db_info.get("port", "")
-        sa_password = ""
-        sa_user     = ""
+        sql_password = ""
+        sql_user     = ""
 
         if server and database:
             self.info_label.setText(f"{server}#{port}#{database}")
@@ -295,8 +289,8 @@ class DatabaseSelectorDialog(QDialog):
 
         if database:
             creds = load_password_for_db(database)
-            sa_password = creds.get('pass', '')
-            sa_user     = creds.get('user', '')
+            sql_password = creds.get('pass', '')
+            sql_user     = creds.get('user', '')
 
         def check_db():
             # ДОДАЙТЕ ЦЕЙ БЛОК ПЕРЕД СТВОРЕННЯМ НОВОГО ПОТОКУ
@@ -324,13 +318,13 @@ class DatabaseSelectorDialog(QDialog):
                 else:
                     self.user_combo.setCurrentText("")
 
-            if server and database and port and sa_password and sa_user:
+            if server and database and port and sql_password and sql_user:
                 cfg = {
                     "server": server,
                     "database": database,
                     "port": port,
-                    "user": sa_user,
-                    "password": sa_password
+                    "user": sql_user,
+                    "password": sql_password
                 }
                 self.db_thread = DBCheckThread(cfg, self)
                 self.db_thread.finished.connect(on_finished)

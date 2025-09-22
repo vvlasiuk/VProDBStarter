@@ -1,5 +1,5 @@
 from PyQt6.QtWidgets import QMenu, QWidgetAction, QWidget, QLabel, QHBoxLayout
-from PyQt6.QtGui import QIcon, QFont, QCursor
+from PyQt6.QtGui import QIcon, QFont
 from PyQt6.QtCore import QSize, Qt
 
 class HoverMenuItem(QWidget):
